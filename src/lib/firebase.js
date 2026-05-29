@@ -5,9 +5,6 @@ import {
   getDocs, getDoc, setDoc, query, where, orderBy, serverTimestamp,
   onSnapshot, limit
 } from "firebase/firestore";
-import {
-  getAuth, GoogleAuthProvider
-} from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAlQsON2HFJM5mCRP18E_R_UGP_x3SXNI8",
@@ -21,23 +18,21 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
-const db = getFirestore(app);
-const auth = getAuth(app);
-const googleProvider = new GoogleAuthProvider();
+export const db = getFirestore(app);
+
+// Shared user ID — no auth, all data stored under this key
+export const USER_ID = "shared";
 
 // ─── Analytics ────────────────────────────────────────────────────────────────
 export const trackEvent = (name, params = {}) => {
   try { logEvent(analytics, name, params); } catch (e) {}
 };
 
-// ─── Auth exports (instances only — functions come from firebase/auth directly)
-export { auth, googleProvider, db };
-
 // ─── Firestore: Leads ─────────────────────────────────────────────────────────
-export const leadsRef = (uid) => collection(db, "users", uid, "leads");
+export const leadsRef = () => collection(db, "leads");
 
-export const addLead = async (uid, lead) => {
-  const ref = await addDoc(leadsRef(uid), {
+export const addLead = async (lead) => {
+  const ref = await addDoc(leadsRef(), {
     ...lead,
     status: "new",
     notes: "",
@@ -49,92 +44,56 @@ export const addLead = async (uid, lead) => {
   return ref.id;
 };
 
-export const updateLead = async (uid, leadId, updates) => {
-  await updateDoc(doc(db, "users", uid, "leads", leadId), {
+export const updateLead = async (leadId, updates) => {
+  await updateDoc(doc(db, "leads", leadId), {
     ...updates,
     updatedAt: serverTimestamp(),
   });
-  trackEvent("lead_updated", { field: Object.keys(updates).join(",") });
 };
 
-export const deleteLead = async (uid, leadId) => {
-  await deleteDoc(doc(db, "users", uid, "leads", leadId));
+export const deleteLead = async (leadId) => {
+  await deleteDoc(doc(db, "leads", leadId));
   trackEvent("lead_deleted");
 };
 
-export const getLeads = async (uid) => {
-  const snap = await getDocs(query(leadsRef(uid), orderBy("createdAt", "desc")));
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-};
-
-export const subscribeLeads = (uid, callback) => {
+export const subscribeLeads = (callback) => {
   return onSnapshot(
-    query(leadsRef(uid), orderBy("createdAt", "desc")),
+    query(leadsRef(), orderBy("createdAt", "desc")),
     snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() })))
   );
 };
 
 // ─── Firestore: Search History ────────────────────────────────────────────────
-export const addSearchHistory = async (uid, search) => {
-  await addDoc(collection(db, "users", uid, "searches"), {
+export const addSearchHistory = async (search) => {
+  await addDoc(collection(db, "searches"), {
     ...search,
     createdAt: serverTimestamp(),
   });
 };
 
-export const getSearchHistory = async (uid) => {
+export const getSearchHistory = async () => {
   const snap = await getDocs(
-    query(collection(db, "users", uid, "searches"), orderBy("createdAt", "desc"), limit(10))
+    query(collection(db, "searches"), orderBy("createdAt", "desc"), limit(10))
   );
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 };
 
-// ─── Firestore: User Profile ──────────────────────────────────────────────────
-export const getUserProfile = async (uid) => {
-  const snap = await getDoc(doc(db, "users", uid));
-  return snap.exists() ? snap.data() : null;
-};
-
-export const updateUserProfile = async (uid, data) => {
-  await updateDoc(doc(db, "users", uid), { ...data, updatedAt: serverTimestamp() });
-};
-
-export const createUserProfile = async (uid, data) => {
-  await setDoc(doc(db, "users", uid), {
-    ...data,
-    plan: "free",
-    searchCount: 0,
-    createdAt: serverTimestamp(),
-  });
-};
-
 // ─── Firestore: Notes ─────────────────────────────────────────────────────────
-export const addNote = async (uid, leadId, note) => {
-  const ref = await addDoc(collection(db, "users", uid, "leads", leadId, "notes"), {
+export const addNote = async (leadId, note) => {
+  const ref = await addDoc(collection(db, "leads", leadId, "notes"), {
     content: note,
     createdAt: serverTimestamp(),
   });
   return ref.id;
 };
 
-export const getNotes = async (uid, leadId) => {
+export const getNotes = async (leadId) => {
   const snap = await getDocs(
-    query(collection(db, "users", uid, "leads", leadId, "notes"), orderBy("createdAt", "asc"))
+    query(collection(db, "leads", leadId, "notes"), orderBy("createdAt", "asc"))
   );
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 };
 
-export const deleteNote = async (uid, leadId, noteId) => {
-  await deleteDoc(doc(db, "users", uid, "leads", leadId, "notes", noteId));
-};
-
-// ─── Firestore: Filtered queries ─────────────────────────────────────────────
-export const getLeadsByTag = async (uid, tag) => {
-  const snap = await getDocs(query(leadsRef(uid), where("tags", "array-contains", tag)));
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-};
-
-export const getLeadsByStatus = async (uid, status) => {
-  const snap = await getDocs(query(leadsRef(uid), where("status", "==", status), orderBy("createdAt", "desc")));
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+export const deleteNote = async (leadId, noteId) => {
+  await deleteDoc(doc(db, "leads", leadId, "notes", noteId));
 };
