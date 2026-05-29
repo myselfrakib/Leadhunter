@@ -1,18 +1,1294 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>LeadHunter — Business Lead Engine</title>
-    <meta name="description" content="The ultimate business lead hunting engine powered by Google Maps and Firebase" />
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎯</text></svg>" />
-    <style>
-      html, body { margin: 0; padding: 0; height: 100%; background: #06060f; overflow: hidden; }
-      #root { height: 100%; }
-    </style>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>LeadHunter Pro</title>
+
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js";
+import {
+  getFirestore, collection, doc, addDoc, updateDoc, deleteDoc,
+  getDocs, getDoc, setDoc, query, where, orderBy, serverTimestamp,
+  onSnapshot, limit
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAlQsON2HFJM5mCRP18E_R_UGP_x3SXNI8",
+  authDomain: "leahunter.firebaseapp.com",
+  projectId: "leahunter",
+  storageBucket: "leahunter.firebasestorage.app",
+  messagingSenderId: "446558524955",
+  appId: "1:446558524955:web:89356211f5b0286efe0abe",
+  measurementId: "G-PV9X2BLHSL"
+};
+
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+const db = getFirestore(app);
+
+window.__fb = {
+  trackEvent: (name, params={}) => { try { logEvent(analytics,name,params); } catch(e){} },
+  addLead: async (lead) => {
+    const ref = await addDoc(collection(db,"leads"), { ...lead, status:"new", notes:"", tags:[], score:0, createdAt:serverTimestamp(), updatedAt:serverTimestamp() });
+    return ref.id;
+  },
+  updateLead: async (id, updates) => { await updateDoc(doc(db,"leads",id), { ...updates, updatedAt:serverTimestamp() }); },
+  deleteLead: async (id) => { await deleteDoc(doc(db,"leads",id)); },
+  subscribeLeads: (cb) => onSnapshot(query(collection(db,"leads"), orderBy("createdAt","desc")), snap => cb(snap.docs.map(d=>({id:d.id,...d.data()})))),
+  addSearchHistory: async (s) => { await addDoc(collection(db,"searches"), { ...s, createdAt:serverTimestamp() }); },
+  getSearchHistory: async () => { const snap = await getDocs(query(collection(db,"searches"), orderBy("createdAt","desc"), limit(20))); return snap.docs.map(d=>({id:d.id,...d.data()})); },
+  addNote: async (leadId, note) => { const ref = await addDoc(collection(db,"leads",leadId,"notes"), { content:note, createdAt:serverTimestamp() }); return ref.id; },
+  getNotes: async (leadId) => { const snap = await getDocs(query(collection(db,"leads",leadId,"notes"), orderBy("createdAt","asc"))); return snap.docs.map(d=>({id:d.id,...d.data()})); },
+  deleteNote: async (leadId, noteId) => { await deleteDoc(doc(db,"leads",leadId,"notes",noteId)); },
+};
+window.dispatchEvent(new Event("fb-ready"));
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Clash+Display:wght@400;500;600;700&family=Cabinet+Grotesk:wght@300;400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root {
+  --bg: #070810;
+  --bg2: #0c0d18;
+  --bg3: #111224;
+  --bg4: #161829;
+  --surface: rgba(255,255,255,0.035);
+  --surface2: rgba(255,255,255,0.06);
+  --surface3: rgba(255,255,255,0.09);
+  --border: rgba(255,255,255,0.06);
+  --border2: rgba(255,255,255,0.11);
+  --border3: rgba(255,255,255,0.18);
+  --text: #eef0ff;
+  --text2: #8892b4;
+  --text3: #4a5278;
+  --text4: #2e3557;
+  --accent: #5b8fff;
+  --accent2: rgba(91,143,255,0.15);
+  --accent3: rgba(91,143,255,0.06);
+  --accentH: #7aa3ff;
+  --cyan: #00e5ff;
+  --cyan2: rgba(0,229,255,0.12);
+  --cyan3: rgba(0,229,255,0.05);
+  --green: #00d68f;
+  --green2: rgba(0,214,143,0.12);
+  --red: #ff4d6d;
+  --red2: rgba(255,77,109,0.12);
+  --gold: #ffb43a;
+  --gold2: rgba(255,180,58,0.12);
+  --purple: #a855f7;
+  --purple2: rgba(168,85,247,0.12);
+  --font-head: 'Outfit', sans-serif;
+  --font-body: 'Outfit', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --r: 10px;
+  --r2: 14px;
+  --r3: 20px;
+  --shadow: 0 8px 40px rgba(0,0,0,0.5);
+  --shadow2: 0 2px 12px rgba(0,0,0,0.3);
+  --glow-accent: 0 0 24px rgba(91,143,255,0.3);
+  --glow-cyan: 0 0 24px rgba(0,229,255,0.25);
+}
+
+html,body,#root { height:100%; font-family:var(--font-body); background:var(--bg); color:var(--text); overflow:hidden; }
+::-webkit-scrollbar { width:3px; height:3px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
+::-webkit-scrollbar-thumb:hover { background:var(--accent); }
+
+input,select,textarea,button { font-family:var(--font-body); }
+input::placeholder,textarea::placeholder { color:var(--text3); }
+
+/* Animations */
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes slideUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideRight{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:translateX(0)}}
+@keyframes slideInRight{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+@keyframes glow-pulse{0%,100%{box-shadow:0 0 8px rgba(91,143,255,0.3)}50%{box-shadow:0 0 20px rgba(91,143,255,0.6)}}
+@keyframes scan-line{0%{top:-4px}100%{top:calc(100% + 4px)}}
+@keyframes number-pop{0%{transform:scale(0.7);opacity:0}80%{transform:scale(1.1)}100%{transform:scale(1);opacity:1}}
+@keyframes radar{0%{transform:scale(0.5);opacity:0.8}100%{transform:scale(2);opacity:0}}
+
+.fade-in{animation:fadeIn 0.25s ease forwards}
+.slide-up{animation:slideUp 0.3s cubic-bezier(0.34,1.4,0.64,1) forwards}
+.slide-right{animation:slideRight 0.3s ease forwards}
+.slide-in-right{animation:slideInRight 0.3s ease forwards}
+.spin{animation:spin 0.8s linear infinite;display:inline-block}
+.pulse{animation:pulse 2s ease-in-out infinite}
+.stagger>*{animation:slideUp 0.25s ease forwards;opacity:0}
+.stagger>*:nth-child(1){animation-delay:.04s}.stagger>*:nth-child(2){animation-delay:.08s}
+.stagger>*:nth-child(3){animation-delay:.12s}.stagger>*:nth-child(4){animation-delay:.16s}
+.stagger>*:nth-child(5){animation-delay:.20s}.stagger>*:nth-child(6){animation-delay:.24s}
+.stagger>*:nth-child(7){animation-delay:.28s}.stagger>*:nth-child(8){animation-delay:.32s}
+.stagger>*:nth-child(9){animation-delay:.36s}.stagger>*:nth-child(10){animation-delay:.40s}
+.stagger>*:nth-child(n+11){animation-delay:.44s}
+.skeleton{background:linear-gradient(90deg,var(--surface) 25%,var(--surface3) 50%,var(--surface) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:var(--r)}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 16px;border-radius:var(--r);border:none;cursor:pointer;font-family:var(--font-body);font-size:13px;font-weight:500;transition:all 0.15s ease;white-space:nowrap;outline:none}
+.btn:active{transform:scale(0.96)}
+.btn-primary{background:linear-gradient(135deg,var(--accent),#3d6ee8);color:#fff;font-weight:600;box-shadow:0 4px 20px rgba(91,143,255,0.35),inset 0 1px 0 rgba(255,255,255,0.15)}
+.btn-primary:hover{box-shadow:0 6px 28px rgba(91,143,255,0.55);transform:translateY(-1px)}
+.btn-primary:disabled{opacity:0.5;cursor:not-allowed;transform:none}
+.btn-cyan{background:linear-gradient(135deg,#00b8cc,#0088aa);color:#000;font-weight:700;box-shadow:0 4px 20px rgba(0,229,255,0.3)}
+.btn-cyan:hover{box-shadow:0 6px 28px rgba(0,229,255,0.5);transform:translateY(-1px)}
+.btn-ghost{background:var(--surface);color:var(--text2);border:1px solid var(--border)}
+.btn-ghost:hover{background:var(--surface2);color:var(--text);border-color:var(--border2)}
+.btn-danger{background:var(--red2);color:var(--red);border:1px solid rgba(255,77,109,0.25)}
+.btn-danger:hover{background:rgba(255,77,109,0.22)}
+.btn-success{background:var(--green2);color:var(--green);border:1px solid rgba(0,214,143,0.25)}
+.btn-icon{padding:7px;border-radius:8px;min-width:32px;min-height:32px}
+.btn-sm{padding:5px 12px;font-size:11px;border-radius:8px}
+
+/* Inputs */
+.input-field{width:100%;padding:9px 13px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-size:13px;outline:none;transition:all 0.18s;font-family:var(--font-body)}
+.input-field:focus{border-color:var(--accent);background:var(--surface2);box-shadow:0 0 0 3px rgba(91,143,255,0.12)}
+.input-field:hover:not(:focus){border-color:var(--border2)}
+select.input-field option{background:var(--bg3);color:var(--text)}
+
+/* Google Places autocomplete */
+.pac-container{background:var(--bg3)!important;border:1px solid var(--border2)!important;border-radius:var(--r)!important;box-shadow:var(--shadow)!important;font-family:var(--font-body)!important;margin-top:4px!important;padding:4px!important}
+.pac-item{color:var(--text2)!important;padding:8px 12px!important;font-size:13px!important;border-top:1px solid var(--border)!important;cursor:pointer!important;border-radius:7px!important}
+.pac-item:first-child{border-top:none!important}
+.pac-item:hover{background:var(--surface2)!important}
+.pac-item-query{color:var(--text)!important}
+.pac-icon{display:none!important}
+.pac-matched{color:var(--accent)!important;font-weight:600!important}
+
+/* Tooltip */
+[data-tip]{position:relative}
+[data-tip]:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--bg4);color:var(--text);font-size:11px;padding:4px 8px;border-radius:6px;white-space:nowrap;border:1px solid var(--border2);pointer-events:none;z-index:1000}
+
+/* Score pill */
+.score-pill{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;font-family:var(--font-mono)}
+
+/* Divider */
+.divider{height:1px;background:var(--border);margin:12px 0}
+
+/* Checkbox */
+.cb{width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border2);background:var(--surface);cursor:pointer;appearance:none;-webkit-appearance:none;display:inline-flex;align-items:center;justify-content:center;transition:all 0.15s;flex-shrink:0}
+.cb:checked{background:var(--accent);border-color:var(--accent)}
+.cb:checked::after{content:"✓";color:#fff;font-size:10px;font-weight:700}
+
+/* Number badge */
+.badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;font-size:10px;font-weight:700;background:var(--accent2);color:var(--accent)}
+
+/* Tab button */
+.tab-btn{background:none;border:none;padding:10px 16px;cursor:pointer;color:var(--text3);font-size:12px;font-weight:500;border-bottom:2px solid transparent;transition:all 0.15s;font-family:var(--font-body);white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.tab-btn:hover:not(.active){color:var(--text2);background:var(--surface)}
+
+/* Glow orbs background */
+.bg-orb{position:fixed;border-radius:50%;pointer-events:none;z-index:0}
+.bg-orb-1{width:600px;height:600px;background:radial-gradient(circle,rgba(91,143,255,0.04) 0%,transparent 70%);top:-200px;right:-100px}
+.bg-orb-2{width:500px;height:500px;background:radial-gradient(circle,rgba(0,229,255,0.03) 0%,transparent 70%);bottom:-100px;left:-100px}
+
+/* Card hover effect */
+.lead-card{transition:all 0.18s;border:1px solid var(--border)}
+.lead-card:hover{border-color:var(--border2);background:var(--surface2)!important;transform:translateX(2px)}
+.lead-card.selected{border-color:var(--accent)!important;background:rgba(91,143,255,0.06)!important}
+
+/* Sidebar section */
+.sidebar-section{padding:14px 16px;border-bottom:1px solid var(--border)}
+.sidebar-label{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:7px}
+
+/* Stat card */
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:10px 14px;transition:all 0.18s}
+.stat-card:hover{border-color:var(--border2);background:var(--surface2)}
+
+/* Tag */
+.tag{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:20px;font-size:11px;background:var(--accent3);color:var(--accent);border:1px solid rgba(91,143,255,0.2)}
+
+/* Scrollable area */
+.scroll-area{overflow-y:auto;scrollbar-width:thin}
+
+/* Radar animation for searching */
+.radar-ring{position:absolute;width:60px;height:60px;border-radius:50%;border:2px solid var(--accent);animation:radar 1.5s ease-out infinite}
+.radar-ring:nth-child(2){animation-delay:0.5s}
+.radar-ring:nth-child(3){animation-delay:1s}
+
+/* Map cluster */
+.cluster-label{background:var(--accent);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;border:2px solid rgba(255,255,255,0.3)}
+
+/* Progress bar */
+.progress-bar{height:3px;background:var(--surface);border-radius:2px;overflow:hidden}
+.progress-fill{height:100%;border-radius:2px;transition:width 0.5s ease}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<div class="bg-orb bg-orb-1"></div>
+<div class="bg-orb bg-orb-2"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback, useMemo, Fragment } = React;
+
+// ─── Constants ───────────────────────────────────────────────────────────────
+const MAPS_KEY = "AIzaSyAlQsON2HFJM5mCRP18E_R_UGP_x3SXNI8";
+
+const STATUS_CONFIG = {
+  new:       { color:"#5b8fff", label:"New",       bg:"rgba(91,143,255,0.1)",  icon:"◈" },
+  contacted: { color:"#ffb43a", label:"Contacted", bg:"rgba(255,180,58,0.1)",  icon:"◉" },
+  qualified: { color:"#00d68f", label:"Qualified", bg:"rgba(0,214,143,0.1)",   icon:"◆" },
+  proposal:  { color:"#a855f7", label:"Proposal",  bg:"rgba(168,85,247,0.1)",  icon:"◇" },
+  won:       { color:"#00e5a0", label:"Won",        bg:"rgba(0,229,160,0.1)",   icon:"★" },
+  lost:      { color:"#ff4d6d", label:"Lost",       bg:"rgba(255,77,109,0.1)",  icon:"✕" },
+};
+
+const BUSINESS_CATEGORIES = [
+  { group:"🍽 Food & Drink", types:[
+    {value:"restaurant",label:"Restaurants",icon:"🍽️"},{value:"cafe",label:"Cafes",icon:"☕"},
+    {value:"bar",label:"Bars & Clubs",icon:"🍸"},{value:"bakery",label:"Bakeries",icon:"🥐"},
+    {value:"meal_delivery",label:"Food Delivery",icon:"📦"},{value:"food",label:"Food General",icon:"🥗"},
+  ]},
+  { group:"🏥 Health & Beauty", types:[
+    {value:"gym",label:"Gyms",icon:"💪"},{value:"beauty_salon",label:"Beauty Salons",icon:"💇"},
+    {value:"spa",label:"Spas",icon:"🧖"},{value:"dentist",label:"Dentists",icon:"🦷"},
+    {value:"doctor",label:"Doctors",icon:"👨‍⚕️"},{value:"pharmacy",label:"Pharmacies",icon:"💊"},
+    {value:"physiotherapist",label:"Physio",icon:"🏃"},{value:"hair_care",label:"Hair Salons",icon:"✂️"},
+  ]},
+  { group:"💼 Professional", types:[
+    {value:"lawyer",label:"Law Firms",icon:"⚖️"},{value:"accounting",label:"Accounting",icon:"📊"},
+    {value:"real_estate_agency",label:"Real Estate",icon:"🏠"},{value:"insurance_agency",label:"Insurance",icon:"🛡️"},
+    {value:"finance",label:"Finance",icon:"💵"},{value:"bank",label:"Banks",icon:"🏦"},
+    {value:"travel_agency",label:"Travel Agents",icon:"✈️"},{value:"moving_company",label:"Movers",icon:"📦"},
+  ]},
+  { group:"🔧 Trades & Services", types:[
+    {value:"electrician",label:"Electricians",icon:"⚡"},{value:"plumber",label:"Plumbers",icon:"🔧"},
+    {value:"roofing_contractor",label:"Roofers",icon:"🏗️"},{value:"general_contractor",label:"Contractors",icon:"👷"},
+    {value:"car_repair",label:"Auto Repair",icon:"🔩"},{value:"locksmith",label:"Locksmiths",icon:"🔑"},
+    {value:"painter",label:"Painters",icon:"🖌️"},{value:"laundry",label:"Laundry",icon:"👕"},
+  ]},
+  { group:"🛍 Retail & Hospitality", types:[
+    {value:"store",label:"Retail Stores",icon:"🛍️"},{value:"car_dealer",label:"Car Dealers",icon:"🚗"},
+    {value:"hotel",label:"Hotels",icon:"🏨"},{value:"pet_store",label:"Pet Stores",icon:"🐾"},
+    {value:"clothing_store",label:"Clothing",icon:"👗"},{value:"florist",label:"Florists",icon:"💐"},
+    {value:"electronics_store",label:"Electronics",icon:"📱"},{value:"furniture_store",label:"Furniture",icon:"🪑"},
+  ]},
+  { group:"🎓 Education & Events", types:[
+    {value:"school",label:"Schools",icon:"🎓"},{value:"university",label:"Universities",icon:"🏛️"},
+    {value:"night_club",label:"Night Clubs",icon:"🎵"},{value:"event_venue",label:"Event Venues",icon:"🎪"},
+    {value:"library",label:"Libraries",icon:"📚"},{value:"art_gallery",label:"Art Galleries",icon:"🖼️"},
+  ]},
+];
+
+const DARK_MAP_STYLES = [
+  {elementType:"geometry",stylers:[{color:"#0a0b16"}]},
+  {elementType:"labels.text.stroke",stylers:[{color:"#0a0b16"}]},
+  {elementType:"labels.text.fill",stylers:[{color:"#6b7591"}]},
+  {featureType:"administrative.locality",elementType:"labels.text.fill",stylers:[{color:"#8892b0"}]},
+  {featureType:"road",elementType:"geometry",stylers:[{color:"#14162a"}]},
+  {featureType:"road.highway",elementType:"geometry",stylers:[{color:"#1a1e35"}]},
+  {featureType:"road.highway",elementType:"labels.text.fill",stylers:[{color:"#4a5580"}]},
+  {featureType:"water",elementType:"geometry",stylers:[{color:"#070910"}]},
+  {featureType:"water",elementType:"labels.text.fill",stylers:[{color:"#3a4060"}]},
+  {featureType:"poi",elementType:"labels",stylers:[{visibility:"off"}]},
+  {featureType:"poi.park",elementType:"geometry",stylers:[{color:"#0d1020"}]},
+  {featureType:"transit",stylers:[{visibility:"off"}]},
+  {featureType:"landscape",elementType:"geometry",stylers:[{color:"#0c0d1e"}]},
+];
+
+// ─── Maps Loader ─────────────────────────────────────────────────────────────
+let mapsPromise = null;
+const loadMaps = () => {
+  if (window.google?.maps) return Promise.resolve();
+  if (mapsPromise) return mapsPromise;
+  mapsPromise = new Promise((res, rej) => {
+    const s = document.createElement("script");
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${MAPS_KEY}&libraries=places,geometry`;
+    s.async = true;
+    s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+  return mapsPromise;
+};
+
+// ─── Lead Scoring ─────────────────────────────────────────────────────────────
+function scoreLeadData(lead) {
+  let score = 0;
+  if (lead.rating >= 4.5) score += 30;
+  else if (lead.rating >= 4.0) score += 20;
+  else if (lead.rating >= 3.5) score += 10;
+  if (lead.user_ratings_total >= 100) score += 25;
+  else if (lead.user_ratings_total >= 50) score += 15;
+  else if (lead.user_ratings_total >= 20) score += 8;
+  if (lead.website) score += 15;
+  if (lead.phone || lead.international_phone_number) score += 10;
+  if (lead.price_level > 0) score += 5;
+  return Math.min(score, 99);
+}
+
+function getScoreColor(score) {
+  if (score >= 70) return "#00d68f";
+  if (score >= 45) return "#ffb43a";
+  return "#ff4d6d";
+}
+
+// ─── Toast ───────────────────────────────────────────────────────────────────
+let _toast = null;
+function Toaster() {
+  const [list, setList] = useState([]);
+  useEffect(() => {
+    _toast = (msg, type="info", duration=3000) => {
+      const id = Date.now();
+      setList(t=>[...t.slice(-3),{id,msg,type}]);
+      setTimeout(()=>setList(t=>t.filter(x=>x.id!==id)), duration);
+    };
+  }, []);
+  const C = {info:"var(--accent)",success:"var(--green)",error:"var(--red)",warning:"var(--gold)"};
+  const I = {info:"ℹ",success:"✓",error:"✕",warning:"⚠"};
+  return <div style={{position:"fixed",bottom:20,right:20,zIndex:9999,display:"flex",flexDirection:"column",gap:8,pointerEvents:"none"}}>
+    {list.map(t=><div key={t.id} className="slide-up" style={{background:"var(--bg4)",border:`1px solid ${C[t.type]}33`,borderLeft:`3px solid ${C[t.type]}`,borderRadius:var_r2,padding:"10px 16px",fontSize:13,color:"var(--text)",maxWidth:320,boxShadow:"0 8px 32px rgba(0,0,0,0.5)",display:"flex",alignItems:"center",gap:9}}>
+      <span style={{color:C[t.type],fontSize:14,fontWeight:700}}>{I[t.type]}</span>
+      <span>{t.msg}</span>
+    </div>)}
+  </div>;
+}
+const var_r2 = "12px";
+const toast = (m,t,d) => _toast?.(m,t,d);
+
+// ─── Firebase Hook ───────────────────────────────────────────────────────────
+function useFirebase() {
+  const [ready, setReady] = useState(!!window.__fb);
+  useEffect(() => {
+    if (window.__fb){setReady(true);return;}
+    const h = () => setReady(true);
+    window.addEventListener("fb-ready", h);
+    return () => window.removeEventListener("fb-ready", h);
+  }, []);
+  return ready ? window.__fb : null;
+}
+
+// ─── useLeads Hook ───────────────────────────────────────────────────────────
+function useLeads(fb) {
+  const [leads, setLeads] = useState([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    if (!fb) return;
+    const unsub = fb.subscribeLeads(data => { setLeads(data); setLoading(false); });
+    return unsub;
+  }, [fb]);
+  const saveLeads = useCallback(async (arr) => {
+    if (!fb) return;
+    await Promise.all(arr.map(l => fb.addLead({...l, score: scoreLeadData(l)})));
+    fb.trackEvent("bulk_save",{count:arr.length});
+  }, [fb]);
+  const updateLead = useCallback(async (id, upd) => fb?.updateLead(id, upd), [fb]);
+  const deleteLead = useCallback(async (id) => fb?.deleteLead(id), [fb]);
+  return { leads, loading, saveLeads, updateLead, deleteLead };
+}
+
+// ─── Status Badge ─────────────────────────────────────────────────────────────
+function StatusBadge({ status, onChange, compact }) {
+  const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.new;
+  if (!onChange) return (
+    <span style={{display:"inline-flex",alignItems:"center",gap:4,padding:compact?"2px 7px":"3px 10px",borderRadius:20,fontSize:10,fontWeight:700,color:cfg.color,background:cfg.bg,border:`1px solid ${cfg.color}33`}}>
+      <span style={{fontSize:8}}>{cfg.icon}</span>{cfg.label}
+    </span>
+  );
+  return (
+    <select value={status} onChange={e=>{e.stopPropagation();onChange(e.target.value);}} onClick={e=>e.stopPropagation()}
+      style={{fontSize:11,fontWeight:700,padding:"3px 8px",borderRadius:20,border:`1px solid ${cfg.color}44`,background:cfg.bg,color:cfg.color,cursor:"pointer",outline:"none",fontFamily:"var(--font-body)"}}>
+      {Object.entries(STATUS_CONFIG).map(([v,c])=><option key={v} value={v}>{c.label}</option>)}
+    </select>
+  );
+}
+
+function Stars({ rating, size=11 }) {
+  if (!rating) return null;
+  const full = Math.round(rating);
+  return <span style={{fontSize:size,color:"#ffb43a",letterSpacing:1}}>
+    {"★".repeat(full)}{"☆".repeat(5-full)}
+    <span style={{color:"var(--text2)",marginLeft:5,fontSize:size-1}}>{rating.toFixed(1)}</span>
+  </span>;
+}
+
+function ScorePill({ score }) {
+  if (!score && score !== 0) return null;
+  const c = getScoreColor(score);
+  return <span className="score-pill" style={{background:`${c}18`,color:c,border:`1px solid ${c}33`}}>
+    ⬡ {score}
+  </span>;
+}
+
+// ─── Map Component ───────────────────────────────────────────────────────────
+function MapPane({ center, radius, leads, onSelect, selected }) {
+  const ref = useRef(); const mapRef = useRef(); const circleRef = useRef();
+  const markers = useRef([]); const iwRef = useRef();
+
+  useEffect(() => {
+    if (!ref.current || !window.google) return;
+    mapRef.current = new window.google.maps.Map(ref.current, {
+      center, zoom:13,
+      mapTypeControl:false, streetViewControl:false, fullscreenControl:true,
+      zoomControl:true, scaleControl:false,
+      zoomControlOptions:{ position: window.google.maps.ControlPosition.RIGHT_BOTTOM },
+      fullscreenControlOptions:{ position: window.google.maps.ControlPosition.RIGHT_TOP },
+      styles: DARK_MAP_STYLES,
+      gestureHandling:"greedy"
+    });
+    iwRef.current = new window.google.maps.InfoWindow({maxWidth:240});
+  }, []);
+
+  useEffect(() => {
+    if (!mapRef.current || !window.google) return;
+    mapRef.current.setCenter(center);
+    if (circleRef.current) circleRef.current.setMap(null);
+    circleRef.current = new window.google.maps.Circle({
+      map: mapRef.current, center, radius: radius * 1000,
+      fillColor:"#5b8fff", fillOpacity:0.05,
+      strokeColor:"#5b8fff", strokeOpacity:0.4, strokeWeight:1.5,
+      strokeDashArray:"4 4"
+    });
+    mapRef.current.fitBounds(circleRef.current.getBounds());
+  }, [center, radius]);
+
+  useEffect(() => {
+    if (!mapRef.current || !window.google) return;
+    markers.current.forEach(m => m.setMap(null));
+    markers.current = [];
+    leads.forEach(lead => {
+      const loc = lead.geometry?.location;
+      if (!loc) return;
+      const pos = { lat: typeof loc.lat==="function"?loc.lat():loc.lat, lng: typeof loc.lng==="function"?loc.lng():loc.lng };
+      const cfg = STATUS_CONFIG[lead.status||"new"];
+      const isSelected = selected?.place_id === lead.place_id;
+      const score = lead.score || scoreLeadData(lead);
+      const scoreColor = getScoreColor(score);
+      const m = new window.google.maps.Marker({
+        map: mapRef.current, position: pos, title: lead.name,
+        icon: {
+          path: window.google.maps.SymbolPath.CIRCLE,
+          scale: isSelected ? 11 : 8,
+          fillColor: isSelected ? "#fff" : cfg.color,
+          fillOpacity: 1,
+          strokeColor: isSelected ? cfg.color : "#070810",
+          strokeWeight: isSelected ? 3 : 2,
+        },
+        zIndex: isSelected ? 100 : 1,
+        animation: isSelected ? window.google.maps.Animation.BOUNCE : null
+      });
+      m.addListener("click", () => {
+        onSelect(lead);
+        iwRef.current.setContent(`
+          <div style="font-family:'Outfit',sans-serif;padding:10px;max-width:220px;background:#111224;color:#eef0ff;border-radius:8px">
+            <p style="margin:0 0 4px;font-weight:700;font-size:13px;line-height:1.3">${lead.name}</p>
+            <p style="margin:0 0 8px;font-size:11px;color:#8892b4;line-height:1.4">${lead.vicinity||""}</p>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              ${lead.rating?`<span style="font-size:11px;color:#ffb43a">★ ${lead.rating}</span>`:""}
+              ${lead.user_ratings_total?`<span style="font-size:10px;color:#6b7591">${lead.user_ratings_total} reviews</span>`:""}
+              <span style="font-size:10px;font-weight:700;color:${scoreColor};background:${scoreColor}18;padding:1px 6px;border-radius:10px">⬡ ${score}</span>
+            </div>
+            ${lead.phone?`<p style="margin:6px 0 0;font-size:11px;color:#5b8fff">📞 ${lead.phone}</p>`:""}
+          </div>
+        `);
+        iwRef.current.open(mapRef.current, m);
+      });
+      markers.current.push(m);
+    });
+  }, [leads, onSelect, selected]);
+
+  return <div ref={ref} style={{width:"100%",height:"100%"}} />;
+}
+
+function MapPlaceholder() {
+  return <div style={{width:"100%",height:"100%",background:"var(--bg2)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,color:"var(--text3)",position:"relative",overflow:"hidden"}}>
+    <div style={{position:"absolute",inset:0,backgroundImage:"radial-gradient(var(--border) 1px, transparent 1px)",backgroundSize:"30px 30px",opacity:0.3}}/>
+    <div style={{position:"relative"}}>
+      <div style={{fontSize:52,filter:"grayscale(0.5)"}}>🗺️</div>
+    </div>
+    <div style={{textAlign:"center",zIndex:1}}>
+      <p style={{fontSize:15,fontWeight:700,color:"var(--text2)",marginBottom:6}}>Interactive Map Loading...</p>
+      <p style={{fontSize:12,color:"var(--text3)",maxWidth:260,lineHeight:1.6}}>Google Maps API key is configured. Map initializes after first search.</p>
+    </div>
+  </div>;
+}
+
+// ─── Lead Card ────────────────────────────────────────────────────────────────
+function LeadCard({ lead, selected, onClick, onStatus, onDelete, checked, onCheck, showCheck }) {
+  const cfg = STATUS_CONFIG[lead.status||"new"];
+  const score = lead.score || scoreLeadData(lead);
+  const hasContact = lead.phone || lead.website;
+  return (
+    <div onClick={onClick} className={`lead-card${selected?" selected":""}`}
+      style={{padding:"11px 13px",borderRadius:"var(--r)",cursor:"pointer",background:"var(--surface)",marginBottom:5,position:"relative"}}>
+      <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
+        {showCheck && <input type="checkbox" className="cb" checked={checked} onClick={e=>{e.stopPropagation();onCheck(!checked)}} style={{marginTop:2}}/>}
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:6,marginBottom:3}}>
+            <p style={{margin:0,fontWeight:600,fontSize:13,color:"var(--text)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>{lead.name}</p>
+            <div style={{display:"flex",gap:4,flexShrink:0}}>
+              <ScorePill score={score}/>
+            </div>
+          </div>
+          <p style={{margin:"0 0 5px",fontSize:11,color:"var(--text2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{lead.vicinity||"—"}</p>
+          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+            {lead.rating && <Stars rating={lead.rating} />}
+            {lead.user_ratings_total > 0 && <span style={{fontSize:10,color:"var(--text3)"}}>{lead.user_ratings_total.toLocaleString()} rev.</span>}
+            {lead.phone && <span style={{fontSize:10,color:"var(--accent)",display:"flex",alignItems:"center",gap:2}}>📞</span>}
+            {lead.website && <span style={{fontSize:10,color:"var(--cyan)",display:"flex",alignItems:"center",gap:2}}>🌐</span>}
+          </div>
+        </div>
+        <div style={{flexShrink:0}}>
+          <StatusBadge status={lead.status||"new"} onChange={s=>onStatus?.(lead.id,s)} compact />
+        </div>
+      </div>
+      {(lead.tags||[]).length > 0 && <div style={{marginTop:7,display:"flex",gap:4,flexWrap:"wrap"}}>
+        {(lead.tags||[]).slice(0,3).map(t=><span key={t} className="tag" style={{fontSize:10,padding:"1px 7px"}}>{t}</span>)}
+        {(lead.tags||[]).length > 3 && <span style={{fontSize:10,color:"var(--text3)"}}>+{lead.tags.length-3}</span>}
+      </div>}
+    </div>
+  );
+}
+
+// ─── Detail Drawer ────────────────────────────────────────────────────────────
+function DetailDrawer({ lead, onClose, onUpdate, onDelete, fb }) {
+  const [details, setDetails] = useState(null);
+  const [notes, setNotes] = useState([]);
+  const [newNote, setNewNote] = useState("");
+  const [tags, setTags] = useState([]);
+  const [newTag, setNewTag] = useState("");
+  const [loadingDet, setLoadingDet] = useState(false);
+  const [activeTab, setActiveTab] = useState("info");
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    if (!lead) return;
+    setTags(lead.tags||[]);setDetails(null);setNotes([]);setActiveTab("info");
+    if (window.google && lead.place_id) {
+      setLoadingDet(true);
+      const svc = new window.google.maps.places.PlacesService(document.createElement("div"));
+      svc.getDetails({ placeId:lead.place_id, fields:["name","formatted_phone_number","international_phone_number","website","opening_hours","price_level","url","rating","user_ratings_total","formatted_address","business_status"] },
+        (r,s) => { if(s==="OK") setDetails(r); setLoadingDet(false); });
+    }
+    if (fb && lead.id) fb.getNotes(lead.id).then(setNotes).catch(()=>{});
+  }, [lead?.id]);
+
+  if (!lead) return null;
+  const score = lead.score || scoreLeadData(lead);
+  const scoreColor = getScoreColor(score);
+
+  const addNote = async () => {
+    if (!newNote.trim()||!fb) return;
+    const id = await fb.addNote(lead.id, newNote.trim());
+    setNotes(n=>[...n,{id,content:newNote.trim(),createdAt:{toDate:()=>new Date()}}]);
+    setNewNote(""); toast("Note saved","success");
+  };
+  const addTag = () => {
+    if (!newTag.trim()) return;
+    const upd = [...new Set([...tags, newTag.trim().toLowerCase()])];
+    setTags(upd); onUpdate(lead.id,{tags:upd}); setNewTag(""); toast("Tag added","success");
+  };
+  const handleDelete = async () => {
+    if (!window.confirm(`Delete "${lead.name}" from pipeline?`)) return;
+    setDeleting(true);
+    await onDelete(lead.id);
+    onClose(); toast("Lead deleted","warning");
+  };
+
+  return (
+    <div className="slide-in-right" style={{position:"absolute",inset:0,background:"var(--bg2)",zIndex:100,display:"flex",flexDirection:"column",borderLeft:"1px solid var(--border)"}}>
+      {/* Header */}
+      <div style={{padding:"16px 18px",borderBottom:"1px solid var(--border)",flexShrink:0}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+          <div style={{flex:1,minWidth:0,paddingRight:10}}>
+            <h2 style={{fontFamily:"var(--font-head)",fontSize:16,fontWeight:700,color:"var(--text)",marginBottom:3,lineHeight:1.3}}>{lead.name}</h2>
+            <p style={{fontSize:11,color:"var(--text2)",lineHeight:1.4}}>{lead.vicinity}</p>
+          </div>
+          <button onClick={onClose} className="btn btn-ghost btn-icon" style={{flexShrink:0}}>✕</button>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+          <StatusBadge status={lead.status||"new"} onChange={s=>onUpdate(lead.id,{status:s})} />
+          <div style={{display:"flex",alignItems:"center",gap:5,padding:"4px 10px",borderRadius:20,background:`${scoreColor}15`,border:`1px solid ${scoreColor}30`}}>
+            <div style={{width:22,height:22,borderRadius:"50%",background:`conic-gradient(${scoreColor} ${score}%, var(--surface) 0)`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <div style={{width:14,height:14,borderRadius:"50%",background:"var(--bg2)"}}/>
+            </div>
+            <span style={{fontSize:11,fontWeight:700,color:scoreColor,fontFamily:"var(--font-mono)"}}>{score}</span>
+            <span style={{fontSize:10,color:"var(--text3)"}}>score</span>
+          </div>
+          {lead.rating && <Stars rating={lead.rating}/>}
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div style={{display:"flex",borderBottom:"1px solid var(--border)",flexShrink:0,overflowX:"auto"}}>
+        {[["info","ℹ Info"],["notes",`📝 Notes${notes.length>0?` (${notes.length})`:""}`],["tags","🏷 Tags"]].map(([t,l])=>
+          <button key={t} className={`tab-btn${activeTab===t?" active":""}`} onClick={()=>setActiveTab(t)} style={{fontSize:11,padding:"8px 14px"}}>{l}</button>
+        )}
+      </div>
+
+      <div className="scroll-area" style={{flex:1,padding:"14px 16px"}}>
+        {activeTab==="info" && <>
+          {loadingDet && <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {[100,80,60,90].map((w,i)=><div key={i} className="skeleton" style={{height:12,width:`${w}%`}}/>)}
+          </div>}
+          {details && <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {[
+              details.formatted_address&&{icon:"📍",label:"Address",value:details.formatted_address},
+              (details.formatted_phone_number||lead.phone)&&{icon:"📞",label:"Phone",value:<a href={`tel:${details.formatted_phone_number||lead.phone}`} style={{color:"var(--accent)",textDecoration:"none"}}>{details.formatted_phone_number||lead.phone}</a>},
+              (details.website||lead.website)&&{icon:"🌐",label:"Website",value:<a href={details.website||lead.website} target="_blank" rel="noreferrer" style={{color:"var(--cyan)",textDecoration:"none",wordBreak:"break-all",fontSize:12}}>{(details.website||lead.website).replace(/^https?:\/\//,"").split("/")[0]}</a>},
+              details.opening_hours&&{icon:"🕐",label:"Status",value:<span style={{color:details.opening_hours.isOpen?.()?"var(--green)":"var(--red)",fontWeight:600}}>{details.opening_hours.isOpen?.()?"✓ Open now":"✕ Closed now"}</span>},
+              details.price_level!==undefined&&details.price_level!==null&&{icon:"💰",label:"Price",value:<span style={{color:"var(--gold)"}}>{["Free","$","$$","$$$","$$$$"][details.price_level]||"—"}</span>},
+              details.business_status&&{icon:"📋",label:"Business",value:<span style={{color:details.business_status==="OPERATIONAL"?"var(--green)":"var(--red)"}}>{details.business_status.replace(/_/g," ")}</span>},
+            ].filter(Boolean).map(({icon,label,value})=>(
+              <div key={label} style={{display:"flex",gap:10,alignItems:"flex-start",padding:"8px 10px",borderRadius:"var(--r)",background:"var(--surface)",border:"1px solid var(--border)"}}>
+                <span style={{fontSize:14,width:20,flexShrink:0,marginTop:1}}>{icon}</span>
+                <span style={{fontSize:11,color:"var(--text3)",width:58,flexShrink:0,paddingTop:1}}>{label}</span>
+                <span style={{fontSize:12,color:"var(--text)",flex:1,lineHeight:1.5}}>{value}</span>
+              </div>
+            ))}
+            {details.opening_hours?.weekday_text && <div style={{background:"var(--surface)",borderRadius:"var(--r)",padding:"10px 12px",border:"1px solid var(--border)"}}>
+              <p style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}}>Opening Hours</p>
+              {details.opening_hours.weekday_text.map((t,i)=>{
+                const [day,...rest]=t.split(": ");
+                return <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"3px 0",borderTop:i>0?"1px solid var(--border)":"none",fontSize:11}}>
+                  <span style={{color:"var(--text2)",fontWeight:500}}>{day}</span>
+                  <span style={{color:"var(--text3)"}}>{rest.join(": ")}</span>
+                </div>;
+              })}
+            </div>}
+          </div>}
+          {details?.url && <a href={details.url} target="_blank" rel="noreferrer" className="btn btn-ghost" style={{width:"100%",justifyContent:"center",textDecoration:"none",marginTop:12,fontSize:12}}>🗺 Open in Google Maps ↗</a>}
+          {lead.id && <button onClick={handleDelete} disabled={deleting} className="btn btn-danger" style={{width:"100%",marginTop:8,fontSize:12}}>{deleting?"Deleting...":"🗑 Delete Lead"}</button>}
+        </>}
+
+        {activeTab==="notes" && <>
+          <div style={{display:"flex",gap:7,marginBottom:10}}>
+            <textarea className="input-field" value={newNote} onChange={e=>setNewNote(e.target.value)} onKeyDown={e=>e.key==="Enter"&&e.ctrlKey&&addNote()} placeholder="Add a note... (Ctrl+Enter to save)" style={{resize:"none",height:70,fontSize:12,lineHeight:1.5}}/>
+          </div>
+          <button onClick={addNote} className="btn btn-primary" style={{width:"100%",marginBottom:14,fontSize:12}}>+ Add Note</button>
+          <div style={{display:"flex",flexDirection:"column",gap:7}}>
+            {notes.length===0 && <p style={{fontSize:12,color:"var(--text3)",textAlign:"center",padding:"20px 0"}}>No notes yet</p>}
+            {notes.map(n=><div key={n.id} style={{background:"var(--surface)",borderRadius:"var(--r)",padding:"10px 12px",border:"1px solid var(--border)"}}>
+              <p style={{fontSize:13,color:"var(--text)",lineHeight:1.6,marginBottom:6}}>{n.content}</p>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span style={{fontSize:10,color:"var(--text3)"}}>{n.createdAt?.toDate?.()?.toLocaleString?.()||"Just now"}</span>
+                <button onClick={async()=>{await fb?.deleteNote(lead.id,n.id);setNotes(p=>p.filter(x=>x.id!==n.id));toast("Note deleted","warning");}} className="btn btn-danger btn-icon" style={{padding:"2px 7px",fontSize:11}}>✕</button>
+              </div>
+            </div>)}
+          </div>
+        </>}
+
+        {activeTab==="tags" && <>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
+            {tags.length===0 && <p style={{fontSize:12,color:"var(--text3)"}}>No tags yet</p>}
+            {tags.map(t=><span key={t} className="tag" style={{fontSize:12}}>
+              {t}
+              <button onClick={()=>{const u=tags.filter(x=>x!==t);setTags(u);onUpdate(lead.id,{tags:u});}} style={{background:"none",border:"none",color:"inherit",cursor:"pointer",padding:"0 0 0 2px",fontSize:13,lineHeight:1}}>×</button>
+            </span>)}
+          </div>
+          <div style={{display:"flex",gap:7}}>
+            <input className="input-field" value={newTag} onChange={e=>setNewTag(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addTag()} placeholder="Add tag and press Enter..." style={{fontSize:12}}/>
+            <button onClick={addTag} className="btn btn-primary btn-icon">+</button>
+          </div>
+          <div style={{marginTop:12}}>
+            <p style={{fontSize:11,color:"var(--text3)",marginBottom:8}}>Quick tags</p>
+            <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+              {["hot lead","follow up","no website","high reviews","local biz","franchise"].map(qt=>(
+                <button key={qt} onClick={()=>{setNewTag(qt);}} className="btn btn-ghost btn-sm" style={{fontSize:10,padding:"3px 9px"}}>{qt}</button>
+              ))}
+            </div>
+          </div>
+        </>}
+      </div>
+    </div>
+  );
+}
+
+// ─── Search Panel ─────────────────────────────────────────────────────────────
+function SearchPanel({ onResults, onCenterChange, fb, onSearchStart }) {
+  const [loc, setLoc] = useState("");
+  const [coords, setCoords] = useState(null);
+  const [radius, setRadius] = useState(2);
+  const [type, setType] = useState("restaurant");
+  const [keyword, setKeyword] = useState("");
+  const [minRating, setMinRating] = useState(0);
+  const [searching, setSearching] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [count, setCount] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const [mapsReady, setMapsReady] = useState(false);
+  const inputRef = useRef();
+  const progressRef = useRef();
+
+  useEffect(() => {
+    loadMaps().then(() => {
+      setMapsReady(true);
+      if (inputRef.current) {
+        const ac = new window.google.maps.places.Autocomplete(inputRef.current, {
+          types:["geocode","establishment"]
+        });
+        ac.addListener("place_changed", () => {
+          const p = ac.getPlace();
+          if (p.geometry) {
+            const c = { lat:p.geometry.location.lat(), lng:p.geometry.location.lng() };
+            setLoc(p.formatted_address||p.name);
+            setCoords(c); onCenterChange(c);
+          }
+        });
+      }
+    }).catch(()=>{});
+    if (fb) fb.getSearchHistory().then(setHistory).catch(()=>{});
+  }, [fb]);
+
+  const doSearch = async () => {
+    if (!coords) { toast("Enter a location first","warning"); return; }
+    if (!mapsReady) { toast("Maps loading, try again...","warning"); return; }
+    setSearching(true); setCount(null); setProgress(10); onSearchStart?.();
+    try {
+      const ll = new window.google.maps.LatLng(coords.lat, coords.lng);
+      const svc = new window.google.maps.places.PlacesService(document.createElement("div"));
+      const req = { location:ll, radius:radius*1000, type };
+      if (keyword.trim()) req.keyword = keyword.trim();
+
+      setProgress(30);
+      const { results, pagination } = await new Promise((res,rej) =>
+        svc.nearbySearch(req, (r,s,p) => s==="OK"||s==="ZERO_RESULTS" ? res({results:r||[],pagination:p}) : rej(new Error(s)))
+      );
+
+      setProgress(60);
+      let all = [...results];
+
+      if (pagination?.hasNextPage) {
+        setProgress(75);
+        const more = await new Promise(res =>
+          setTimeout(()=>pagination.nextPage((r,s)=>res(s==="OK"?r:[])), 2000)
+        );
+        all = [...all, ...more];
+      }
+
+      setProgress(90);
+      if (minRating > 0) all = all.filter(r => (r.rating||0) >= minRating);
+
+      const enriched = all.map(r => ({ ...r, score: scoreLeadData(r) }));
+      enriched.sort((a,b) => (b.score||0)-(a.score||0));
+
+      setProgress(100);
+      setCount(enriched.length);
+      onResults(enriched, coords, radius);
+      if (fb) fb.addSearchHistory({ location:loc, coords, radius, type, keyword, minRating, resultCount:enriched.length }).catch(()=>{});
+      fb?.trackEvent("search",{type,radius,count:enriched.length});
+      toast(`Found ${enriched.length} businesses — sorted by score!`, "success");
+    } catch(err) {
+      toast("Search failed: "+err.message, "error");
+    } finally {
+      setSearching(false);
+      setTimeout(()=>setProgress(0), 800);
+    }
+  };
+
+  const useMyLocation = () => {
+    if (!navigator.geolocation) { toast("Geolocation not supported","error"); return; }
+    navigator.geolocation.getCurrentPosition(pos => {
+      const c = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      setCoords(c); onCenterChange(c); setLoc("My Location");
+      toast("Location detected!","success");
+    }, () => toast("Location access denied","error"));
+  };
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",height:"100%"}}>
+      {/* Search progress */}
+      {progress > 0 && <div className="progress-bar" style={{position:"absolute",top:0,left:0,right:0,zIndex:50}}>
+        <div className="progress-fill" style={{width:`${progress}%`,background:"linear-gradient(90deg,var(--accent),var(--cyan))"}}/>
+      </div>}
+
+      <div className="scroll-area" style={{flex:1,padding:"14px 14px 8px"}}>
+
+        {/* Logo area */}
+        <div style={{marginBottom:16,paddingBottom:14,borderBottom:"1px solid var(--border)"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
+            <div style={{width:32,height:32,borderRadius:10,background:"linear-gradient(135deg,var(--accent),#3d6ee8)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,boxShadow:"var(--glow-accent)"}}>🎯</div>
+            <div>
+              <p style={{fontSize:15,fontWeight:800,fontFamily:"var(--font-head)",color:"var(--text)",letterSpacing:"-0.02em",lineHeight:1}}>LeadHunter<span style={{color:"var(--accent)"}}>Pro</span></p>
+              <p style={{fontSize:9,color:"var(--text3)",letterSpacing:"0.1em",textTransform:"uppercase",marginTop:1}}>Smart Lead Finder</p>
+            </div>
+          </div>
+          {!fb && <div style={{fontSize:10,color:"var(--gold)",background:"var(--gold2)",border:"1px solid rgba(255,180,58,0.25)",padding:"4px 8px",borderRadius:7,display:"inline-flex",alignItems:"center",gap:4}}>
+            <span className="pulse" style={{width:5,height:5,borderRadius:"50%",background:"var(--gold)",display:"inline-block"}}/>
+            Connecting to database...
+          </div>}
+        </div>
+
+        {/* Location */}
+        <div style={{marginBottom:11}}>
+          <label className="sidebar-label">📍 Location</label>
+          <div style={{position:"relative"}}>
+            <input ref={inputRef} className="input-field" value={loc} onChange={e=>setLoc(e.target.value)} placeholder="City, address, or place name..." style={{paddingRight:36}}/>
+            <button onClick={useMyLocation} style={{position:"absolute",right:6,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:15,padding:2}} data-tip="Use my location">⊕</button>
+          </div>
+        </div>
+
+        {/* Business Type */}
+        <div style={{marginBottom:11}}>
+          <label className="sidebar-label">🏢 Business Type</label>
+          <select className="input-field" value={type} onChange={e=>setType(e.target.value)} style={{background:"var(--surface)"}}>
+            {BUSINESS_CATEGORIES.map(g=><optgroup key={g.group} label={g.group}>
+              {g.types.map(t=><option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
+            </optgroup>)}
+          </select>
+        </div>
+
+        {/* Keyword */}
+        <div style={{marginBottom:11}}>
+          <label className="sidebar-label">🔤 Keyword <span style={{fontWeight:400,textTransform:"none"}}>(optional)</span></label>
+          <input className="input-field" value={keyword} onChange={e=>setKeyword(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doSearch()} placeholder="e.g. Italian, luxury, fast..." />
+        </div>
+
+        {/* Radius */}
+        <div style={{marginBottom:11}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+            <label className="sidebar-label" style={{marginBottom:0}}>📏 Search Radius</label>
+            <span style={{fontSize:12,fontWeight:700,color:"var(--accent)",fontFamily:"var(--font-mono)"}}>{radius} km</span>
+          </div>
+          <input type="range" min="0.5" max="50" step="0.5" value={radius} onChange={e=>setRadius(+e.target.value)}
+            style={{width:"100%",accentColor:"var(--accent)",cursor:"pointer",height:4}}/>
+          <div style={{display:"flex",justifyContent:"space-between",marginTop:3}}>
+            <span style={{fontSize:10,color:"var(--text4)"}}>0.5 km</span>
+            <span style={{fontSize:10,color:"var(--text4)"}}>50 km</span>
+          </div>
+        </div>
+
+        {/* Min Rating */}
+        <div style={{marginBottom:14}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+            <label className="sidebar-label" style={{marginBottom:0}}>⭐ Min Rating</label>
+            <span style={{fontSize:12,fontWeight:700,color:"var(--gold)",fontFamily:"var(--font-mono)"}}>{minRating>0?`${minRating}+`:"Any"}</span>
+          </div>
+          <div style={{display:"flex",gap:5}}>
+            {[0,3,3.5,4,4.5].map(v=>(
+              <button key={v} onClick={()=>setMinRating(v)}
+                style={{flex:1,padding:"5px 3px",borderRadius:7,border:`1px solid ${minRating===v?"var(--gold)":"var(--border)"}`,background:minRating===v?"var(--gold2)":"var(--surface)",color:minRating===v?"var(--gold)":"var(--text3)",fontSize:10,fontWeight:600,cursor:"pointer",fontFamily:"var(--font-body)"}}>
+                {v===0?"Any":`${v}★`}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Search Button */}
+        <button onClick={doSearch} disabled={searching||!mapsReady} className="btn btn-primary"
+          style={{width:"100%",padding:12,fontSize:13,fontWeight:700,letterSpacing:"0.02em",marginBottom:10}}>
+          {searching
+            ? <><div style={{width:14,height:14,border:"2px solid rgba(255,255,255,0.3)",borderTop:"2px solid #fff",borderRadius:"50%"}} className="spin"/> Scanning area...</>
+            : <><span style={{fontSize:15}}>🎯</span> Hunt Leads</>
+          }
+        </button>
+
+        {/* Result count bubble */}
+        {count !== null && <div className="fade-in" style={{background:"linear-gradient(135deg,var(--accent3),var(--cyan3))",border:"1px solid var(--accent2)",borderRadius:"var(--r)",padding:"12px 14px",textAlign:"center",marginBottom:12}}>
+          <div style={{display:"flex",justifyContent:"center",gap:20}}>
+            <div>
+              <p style={{fontSize:26,fontWeight:800,fontFamily:"var(--font-head)",color:"var(--accent)",lineHeight:1}}>{count}</p>
+              <p style={{fontSize:10,color:"var(--text2)",marginTop:2}}>businesses found</p>
+            </div>
+          </div>
+        </div>}
+
+        {/* Search History */}
+        <div>
+          <button onClick={()=>setShowHistory(p=>!p)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",color:"var(--text3)",fontSize:11}}>
+            <span style={{fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em"}}>🕐 Search History</span>
+            <span>{showHistory?"▲":"▼"}</span>
+          </button>
+          {showHistory && history.length > 0 && <div style={{display:"flex",flexDirection:"column",gap:4,marginTop:6}}>
+            {history.slice(0,8).map(h=>(
+              <button key={h.id} onClick={()=>{
+                setLoc(h.location||""); setCoords(h.coords);
+                setRadius(h.radius||2); setType(h.type||"restaurant");
+                setKeyword(h.keyword||""); setMinRating(h.minRating||0);
+                if(h.coords) onCenterChange(h.coords);
+              }} className="btn btn-ghost" style={{justifyContent:"flex-start",fontSize:11,padding:"6px 9px",textAlign:"left"}}>
+                <div style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>
+                  <span style={{color:"var(--text)"}}>{h.location||"Unknown"}</span>
+                  <span style={{color:"var(--text3)",marginLeft:6}}>{h.type} · {h.radius}km</span>
+                </div>
+                {h.resultCount != null && <span style={{fontSize:10,color:"var(--accent)",marginLeft:6,flexShrink:0}}>{h.resultCount}</span>}
+              </button>
+            ))}
+          </div>}
+          {showHistory && history.length === 0 && <p style={{fontSize:11,color:"var(--text3)",padding:"8px 0"}}>No history yet</p>}
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+// ─── Pipeline Stats Bar ────────────────────────────────────────────────────────
+function PipelineStats({ leads }) {
+  const counts = useMemo(()=>{
+    const c={total:leads.length,avgScore:0,withContact:0};
+    Object.keys(STATUS_CONFIG).forEach(s=>c[s]=0);
+    let totalScore=0;
+    leads.forEach(l=>{
+      const s=l.status||"new"; c[s]=(c[s]||0)+1;
+      totalScore+=(l.score||0);
+      if(l.phone||l.website) c.withContact++;
+    });
+    c.avgScore=leads.length?Math.round(totalScore/leads.length):0;
+    return c;
+  },[leads]);
+
+  return (
+    <div style={{padding:"8px 14px",borderBottom:"1px solid var(--border)",display:"flex",gap:6,overflowX:"auto",flexShrink:0,background:"var(--bg2)"}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,paddingRight:10,borderRight:"1px solid var(--border)",flexShrink:0,marginRight:2}}>
+        <div>
+          <p style={{fontSize:16,fontWeight:800,fontFamily:"var(--font-head)",color:"var(--text)",lineHeight:1}}>{counts.total}</p>
+          <p style={{fontSize:9,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.06em"}}>Total</p>
+        </div>
+        <div>
+          <p style={{fontSize:16,fontWeight:800,fontFamily:"var(--font-head)",color:getScoreColor(counts.avgScore),lineHeight:1}}>{counts.avgScore}</p>
+          <p style={{fontSize:9,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.06em"}}>Avg Score</p>
+        </div>
+      </div>
+      {Object.entries(STATUS_CONFIG).map(([s,cfg])=>counts[s]>0&&(
+        <div key={s} style={{display:"flex",alignItems:"center",gap:5,padding:"3px 9px",borderRadius:20,background:cfg.bg,border:`1px solid ${cfg.color}33`,flexShrink:0,cursor:"default"}} data-tip={cfg.label}>
+          <span style={{fontSize:14,fontWeight:800,fontFamily:"var(--font-head)",color:cfg.color}}>{counts[s]}</span>
+          <span style={{fontSize:9,color:cfg.color,opacity:0.8}}>{cfg.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Bulk Actions Bar ─────────────────────────────────────────────────────────
+function BulkActionsBar({ selected, onStatusChange, onDelete, onClear }) {
+  if (selected.size === 0) return null;
+  return (
+    <div className="fade-in" style={{padding:"8px 12px",background:"var(--bg4)",borderBottom:"1px solid var(--accent2)",display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+      <span style={{fontSize:12,fontWeight:600,color:"var(--accent)",marginRight:2}}>{selected.size} selected</span>
+      <select className="input-field" onChange={e=>e.target.value&&onStatusChange(e.target.value)} defaultValue=""
+        style={{height:28,fontSize:11,padding:"3px 8px",background:"var(--surface)",width:130}}>
+        <option value="" disabled>Set status...</option>
+        {Object.entries(STATUS_CONFIG).map(([v,c])=><option key={v} value={v}>{c.label}</option>)}
+      </select>
+      <button onClick={onDelete} className="btn btn-danger btn-sm">🗑 Delete</button>
+      <button onClick={onClear} className="btn btn-ghost btn-sm">Clear</button>
+    </div>
+  );
+}
+
+// ─── Results Toolbar ──────────────────────────────────────────────────────────
+function ResultsToolbar({ count, onSortChange, sort, onFilter, filter, onSelectAll, allSelected, showCheck, onToggleCheck }) {
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:6,padding:"7px 12px",borderBottom:"1px solid var(--border)",flexShrink:0,background:"var(--bg2)"}}>
+      <button onClick={onToggleCheck} className="btn btn-ghost btn-sm" style={{padding:"4px 9px",fontSize:10}}>
+        {showCheck?"Hide":"Select"}
+      </button>
+      {showCheck && <input type="checkbox" className="cb" checked={allSelected} onChange={e=>onSelectAll(e.target.checked)} title="Select all"/>}
+      <span style={{fontSize:11,color:"var(--text3)",marginLeft:2}}>{count} result{count!==1?"s":""}</span>
+      <div style={{marginLeft:"auto",display:"flex",gap:6}}>
+        <input className="input-field" value={filter} onChange={e=>onFilter(e.target.value)} placeholder="Filter..." style={{width:130,height:28,fontSize:11,padding:"4px 10px"}}/>
+        <select className="input-field" value={sort} onChange={e=>onSortChange(e.target.value)} style={{height:28,fontSize:11,padding:"4px 8px",background:"var(--surface)",width:110}}>
+          <option value="score">Sort: Score</option>
+          <option value="rating">Sort: Rating</option>
+          <option value="reviews">Sort: Reviews</option>
+          <option value="name">Sort: Name</option>
+        </select>
+      </div>
+    </div>
+  );
+}
+
+// ─── Empty State ───────────────────────────────────────────────────────────────
+function EmptyState({ tab, loading }) {
+  return (
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100%",gap:14,padding:40,textAlign:"center"}}>
+      <div style={{position:"relative"}}>
+        <div style={{fontSize:52,filter:"drop-shadow(0 0 20px rgba(91,143,255,0.2))"}}>{tab==="search"?"🎯":"💼"}</div>
+        {tab==="search"&&<div style={{position:"absolute",inset:-10}}>
+          <div className="radar-ring"/>
+          <div className="radar-ring"/>
+        </div>}
+      </div>
+      <div>
+        <p style={{fontSize:15,fontFamily:"var(--font-head)",fontWeight:700,color:"var(--text2)",marginBottom:6}}>
+          {tab==="search"?"Ready to hunt leads":loading?"Loading pipeline...":"Pipeline empty"}
+        </p>
+        <p style={{fontSize:12,color:"var(--text3)",maxWidth:220,lineHeight:1.6}}>
+          {tab==="search"?"Enter a location and business type in the panel to start finding leads.":"Search for businesses and save them to start building your pipeline."}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ─── App ──────────────────────────────────────────────────────────────────────
+function App() {
+  const fb = useFirebase();
+  const { leads, loading, saveLeads, updateLead, deleteLead } = useLeads(fb);
+  const [center, setCenter] = useState({lat:40.7128,lng:-74.006});
+  const [radius, setRadius] = useState(2);
+  const [results, setResults] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const [tab, setTab] = useState("search");
+  const [view, setView] = useState("split");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterText, setFilterText] = useState("");
+  const [sort, setSort] = useState("score");
+  const [saving, setSaving] = useState(false);
+  const [mapsReady, setMapsReady] = useState(false);
+  const [checkedIds, setCheckedIds] = useState(new Set());
+  const [showCheck, setShowCheck] = useState(false);
+
+  useEffect(() => { loadMaps().then(()=>setMapsReady(true)).catch(()=>{}); }, []);
+
+  const handleResults = useCallback((r, c, rad) => {
+    setResults(r); setCenter(c); setRadius(rad); setTab("search"); setSelected(null); setCheckedIds(new Set());
+  }, []);
+
+  const handleSaveAll = async () => {
+    if (!results.length||!fb) return;
+    setSaving(true);
+    try {
+      const toSave = results.map(r=>({
+        name:r.name, vicinity:r.vicinity||"",
+        rating:r.rating||null, user_ratings_total:r.user_ratings_total||null,
+        place_id:r.place_id, types:r.types||[],
+        website:r.website||"", phone:r.international_phone_number||"",
+        score: scoreLeadData(r),
+        geometry:{ location:{ lat:typeof r.geometry?.location?.lat==="function"?r.geometry.location.lat():r.geometry?.location?.lat, lng:typeof r.geometry?.location?.lng==="function"?r.geometry.location.lng():r.geometry?.location?.lng } }
+      }));
+      await saveLeads(toSave);
+      toast(`${results.length} leads saved to pipeline!`, "success");
+      setTab("leads"); setResults([]);
+    } catch(e) { toast("Save failed: "+e.message,"error"); }
+    finally { setSaving(false); }
+  };
+
+  const handleSaveSelected = async () => {
+    if (!fb||checkedIds.size===0) return;
+    setSaving(true);
+    try {
+      const toSave = results.filter(r=>checkedIds.has(r.place_id)).map(r=>({
+        name:r.name, vicinity:r.vicinity||"",
+        rating:r.rating||null, user_ratings_total:r.user_ratings_total||null,
+        place_id:r.place_id, types:r.types||[],
+        website:r.website||"", phone:r.international_phone_number||"",
+        score: scoreLeadData(r),
+        geometry:{ location:{ lat:typeof r.geometry?.location?.lat==="function"?r.geometry.location.lat():r.geometry?.location?.lat, lng:typeof r.geometry?.location?.lng==="function"?r.geometry.location.lng():r.geometry?.location?.lng } }
+      }));
+      await saveLeads(toSave);
+      toast(`${toSave.length} selected leads saved!`, "success");
+      setTab("leads"); setResults([]);
+    } catch(e) { toast("Save failed","error"); }
+    finally { setSaving(false); }
+  };
+
+  const exportCSV = () => {
+    const src = tab==="search"?results:filteredLeads;
+    if (!src.length) { toast("Nothing to export","warning"); return; }
+    const rows=[["Name","Address","Rating","Reviews","Score","Status","Phone","Website","Tags"]];
+    src.forEach(l=>rows.push([l.name,l.vicinity||"",l.rating||"",l.user_ratings_total||"",l.score||scoreLeadData(l),l.status||"new",l.phone||"",l.website||"",(l.tags||[]).join("; ")]));
+    const csv=rows.map(r=>r.map(c=>`"${String(c||"").replace(/"/g,'""')}"`).join(",")).join("\n");
+    const a=document.createElement("a"); a.href="data:text/csv;charset=utf-8,"+encodeURIComponent(csv); a.download=`leadhunter-export-${Date.now()}.csv`; a.click();
+    toast("CSV exported!","success");
+  };
+
+  const bulkStatusUpdate = async (newStatus) => {
+    if (!fb||checkedIds.size===0) return;
+    const ids = Array.from(checkedIds);
+    await Promise.all(ids.map(id => updateLead(id, {status:newStatus})));
+    toast(`${ids.length} leads updated to ${STATUS_CONFIG[newStatus].label}`, "success");
+    setCheckedIds(new Set());
+  };
+
+  const bulkDelete = async () => {
+    if (!fb||checkedIds.size===0) return;
+    if (!window.confirm(`Delete ${checkedIds.size} leads?`)) return;
+    const ids = Array.from(checkedIds);
+    await Promise.all(ids.map(id => deleteLead(id)));
+    toast(`${ids.length} leads deleted`, "warning");
+    setCheckedIds(new Set());
+  };
+
+  const sortedResults = useMemo(()=>{
+    const list = [...results];
+    if (sort==="score") list.sort((a,b)=>(b.score||scoreLeadData(b))-(a.score||scoreLeadData(a)));
+    else if (sort==="rating") list.sort((a,b)=>(b.rating||0)-(a.rating||0));
+    else if (sort==="reviews") list.sort((a,b)=>(b.user_ratings_total||0)-(a.user_ratings_total||0));
+    else if (sort==="name") list.sort((a,b)=>a.name.localeCompare(b.name));
+    return list;
+  },[results,sort]);
+
+  const filteredLeads = useMemo(()=>{
+    let list = [...leads];
+    if (filterStatus!=="all") list=list.filter(l=>(l.status||"new")===filterStatus);
+    if (filterText) {
+      const q=filterText.toLowerCase();
+      list=list.filter(l=>l.name?.toLowerCase().includes(q)||l.vicinity?.toLowerCase().includes(q)||(l.tags||[]).some(t=>t.includes(q)));
+    }
+    if (sort==="score") list.sort((a,b)=>(b.score||0)-(a.score||0));
+    else if (sort==="rating") list.sort((a,b)=>(b.rating||0)-(a.rating||0));
+    else if (sort==="reviews") list.sort((a,b)=>(b.user_ratings_total||0)-(a.user_ratings_total||0));
+    else if (sort==="name") list.sort((a,b)=>a.name.localeCompare(b.name));
+    return list;
+  },[leads,filterStatus,filterText,sort]);
+
+  const display = tab==="search" ? sortedResults : filteredLeads;
+  const displayLeads = display; // for map
+
+  const allIds = tab==="search" ? results.map(r=>r.place_id) : filteredLeads.map(l=>l.id);
+  const allSelected = allIds.length>0 && allIds.every(id=>checkedIds.has(id));
+
+  const handleSelectAll = (checked) => {
+    if (checked) setCheckedIds(new Set(allIds));
+    else setCheckedIds(new Set());
+  };
+
+  return <>
+    <Toaster/>
+    <div style={{height:"100vh",display:"flex",flexDirection:"column",background:"var(--bg)",overflow:"hidden",position:"relative",zIndex:1}}>
+
+      {/* Top Bar */}
+      <div style={{height:50,background:"var(--bg2)",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",padding:"0 14px",gap:10,flexShrink:0,boxShadow:"0 1px 0 var(--border)"}}>
+
+        {/* Logo */}
+        <div style={{display:"flex",alignItems:"center",gap:8,marginRight:6}}>
+          <div style={{width:30,height:30,borderRadius:9,background:"linear-gradient(135deg,var(--accent),#2f5dcc)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,boxShadow:"var(--glow-accent)"}}>🎯</div>
+          <div style={{lineHeight:1}}>
+            <span style={{fontFamily:"var(--font-head)",fontWeight:800,fontSize:15,color:"var(--text)",letterSpacing:"-0.02em"}}>LeadHunter</span>
+            <span style={{fontFamily:"var(--font-head)",fontWeight:800,fontSize:15,color:"var(--accent)",letterSpacing:"-0.02em"}}>Pro</span>
+          </div>
+          {!fb && <span style={{fontSize:9,color:"var(--gold)",background:"var(--gold2)",border:"1px solid rgba(255,180,58,0.3)",padding:"2px 7px",borderRadius:8,display:"flex",alignItems:"center",gap:3}}>
+            <span className="spin" style={{width:8,height:8,border:"1.5px solid rgba(255,180,58,0.3)",borderTop:"1.5px solid var(--gold)",borderRadius:"50%",display:"inline-block"}}/>CONNECTING
+          </span>}
+        </div>
+
+        {/* View toggle */}
+        <div style={{display:"flex",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:3,gap:2}}>
+          {[["split","⚡"],["map","🗺"],["list","≡"]].map(([v,l])=>(
+            <button key={v} onClick={()=>setView(v)} title={v.charAt(0).toUpperCase()+v.slice(1)+" view"}
+              style={{background:view===v?"var(--accent)":"transparent",color:view===v?"#fff":"var(--text3)",border:"none",borderRadius:7,padding:"4px 10px",fontSize:13,cursor:"pointer",transition:"all 0.15s",fontFamily:"var(--font-body)",fontWeight:view===v?700:400}}>
+              {l}
+            </button>
+          ))}
+        </div>
+
+        {/* Spacer */}
+        <div style={{flex:1}}/>
+
+        {/* Actions */}
+        <div style={{display:"flex",gap:6,alignItems:"center"}}>
+          {tab==="search"&&results.length>0&&<>
+            {checkedIds.size>0&&<button onClick={handleSaveSelected} disabled={saving||!fb} className="btn btn-success btn-sm">{saving?"...":` Save ${checkedIds.size} selected`}</button>}
+            <button onClick={handleSaveAll} disabled={saving||!fb} className="btn btn-primary btn-sm" style={{fontSize:12}}>
+              {saving?<><div style={{width:12,height:12,border:"1.5px solid rgba(255,255,255,0.3)",borderTop:"1.5px solid #fff",borderRadius:"50%"}} className="spin"/>Saving...</>:`💾 Save All (${results.length})`}
+            </button>
+          </>}
+          <button onClick={exportCSV} className="btn btn-ghost btn-icon" title="Export CSV" style={{fontSize:13}}>↓CSV</button>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div style={{flex:1,display:"flex",overflow:"hidden"}}>
+
+        {/* Sidebar */}
+        <div style={{width:252,flexShrink:0,borderRight:"1px solid var(--border)",overflowY:"hidden",background:"var(--bg2)",display:"flex",flexDirection:"column",position:"relative"}}>
+          <SearchPanel onResults={handleResults} onCenterChange={setCenter} fb={fb} onSearchStart={()=>setSelected(null)}/>
+        </div>
+
+        {/* Main Content */}
+        <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+
+          {/* Tabs */}
+          <div style={{display:"flex",borderBottom:"1px solid var(--border)",background:"var(--bg2)",flexShrink:0,alignItems:"center",paddingLeft:2}}>
+            <button className={`tab-btn${tab==="search"?" active":""}`} onClick={()=>{setTab("search");setSelected(null);}}>
+              🔍 Results {results.length>0&&<span className="badge">{results.length}</span>}
+            </button>
+            <button className={`tab-btn${tab==="leads"?" active":""}`} onClick={()=>{setTab("leads");setSelected(null);}}>
+              💼 Pipeline {leads.length>0&&<span className="badge">{leads.length}</span>}
+            </button>
+
+            {tab==="leads"&&<>
+              <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:6,paddingRight:10}}>
+                <input className="input-field" value={filterText} onChange={e=>setFilterText(e.target.value)} placeholder="Search..." style={{width:130,height:28,fontSize:11,padding:"4px 10px"}}/>
+                <select className="input-field" value={filterStatus} onChange={e=>setFilterStatus(e.target.value)} style={{width:112,height:28,fontSize:11,padding:"4px 8px",background:"var(--surface)"}}>
+                  <option value="all">All Status</option>
+                  {Object.entries(STATUS_CONFIG).map(([v,c])=><option key={v} value={v}>{c.label}</option>)}
+                </select>
+              </div>
+            </>}
+          </div>
+
+          {tab==="leads"&&<PipelineStats leads={leads}/>}
+
+          {/* Bulk action bar for results */}
+          {tab==="search"&&showCheck&&<BulkActionsBar selected={checkedIds} onStatusChange={()=>{}} onDelete={()=>{}} onClear={()=>setCheckedIds(new Set())}/>}
+          {tab==="leads"&&showCheck&&<BulkActionsBar selected={checkedIds} onStatusChange={bulkStatusUpdate} onDelete={bulkDelete} onClear={()=>setCheckedIds(new Set())}/>}
+
+          {/* Pane area */}
+          <div style={{flex:1,display:"flex",overflow:"hidden",position:"relative"}}>
+
+            {/* Map */}
+            {(view==="split"||view==="map")&&(
+              <div style={{flex:view==="map"?1:"0 0 54%",position:"relative",overflow:"hidden",borderRight:view==="split"?"1px solid var(--border)":"none"}}>
+                {mapsReady
+                  ? <MapPane center={center} radius={radius} leads={displayLeads} onSelect={s=>{setSelected(s);}} selected={selected}/>
+                  : <MapPlaceholder/>
+                }
+              </div>
+            )}
+
+            {/* List */}
+            {(view==="split"||view==="list")&&(
+              <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",background:"var(--bg2)",position:"relative"}}>
+                <ResultsToolbar
+                  count={display.length} sort={sort} onSortChange={setSort}
+                  filter={tab==="search"?"":filterText} onFilter={tab==="leads"?setFilterText:()=>{}}
+                  onSelectAll={handleSelectAll} allSelected={allSelected}
+                  showCheck={showCheck} onToggleCheck={()=>{setShowCheck(p=>!p);setCheckedIds(new Set());}}
+                />
+
+                <div className="scroll-area" style={{flex:1,position:"relative"}}>
+                  {display.length === 0
+                    ? <EmptyState tab={tab} loading={loading}/>
+                    : <div className="stagger" style={{padding:"10px 10px"}}>
+                        {display.map(lead=>(
+                          <LeadCard key={lead.id||lead.place_id} lead={lead}
+                            selected={selected?.place_id===lead.place_id}
+                            onClick={()=>setSelected(selected?.place_id===lead.place_id?null:lead)}
+                            onStatus={(id,s)=>updateLead(id,s?{status:s}:{})}
+                            checked={checkedIds.has(lead.id||lead.place_id)}
+                            onCheck={(v)=>{
+                              const id=lead.id||lead.place_id;
+                              setCheckedIds(prev=>{const n=new Set(prev);v?n.add(id):n.delete(id);return n;});
+                            }}
+                            showCheck={showCheck}
+                          />
+                        ))}
+                      </div>
+                  }
+                  {selected&&(
+                    <div style={{position:"absolute",inset:0}}>
+                      <DetailDrawer lead={selected} onClose={()=>setSelected(null)} onUpdate={updateLead} onDelete={deleteLead} fb={fb}/>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  </>;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
 </html>
