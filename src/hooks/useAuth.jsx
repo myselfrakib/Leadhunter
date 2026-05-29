@@ -1,9 +1,12 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { onAuthStateChanged } from "firebase/auth";
 import {
-  auth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
-  signOut, updateProfile, sendPasswordResetEmail, signInWithPopup,
-  googleProvider, createUserProfile, getUserProfile, trackEvent
+  signInWithEmailAndPassword, createUserWithEmailAndPassword,
+  signOut, onAuthStateChanged, updateProfile,
+  sendPasswordResetEmail, signInWithPopup
+} from "firebase/auth";
+import {
+  auth, googleProvider,
+  createUserProfile, getUserProfile, trackEvent
 } from "../lib/firebase";
 
 const AuthContext = createContext(null);
@@ -21,7 +24,7 @@ export function AuthProvider({ children }) {
         try {
           const p = await getUserProfile(u.uid);
           setProfile(p);
-        } catch (e) { /* profile may not exist yet */ }
+        } catch (e) {}
       } else {
         setProfile(null);
       }
