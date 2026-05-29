@@ -1,51 +1,42 @@
 import { useState, useEffect, useCallback } from "react";
 import {
-  subscribeLeads, addLead, updateLead as fbUpdate,
+  subscribeLeads, addLead as fbAdd, updateLead as fbUpdate,
   deleteLead as fbDelete, addSearchHistory, trackEvent
 } from "../lib/firebase";
-import { useAuth } from "./useAuth";
 
 export function useLeads() {
-  const { user } = useAuth();
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) { setLeads([]); setLoading(false); return; }
-    const unsub = subscribeLeads(user.uid, (data) => {
+    const unsub = subscribeLeads((data) => {
       setLeads(data);
       setLoading(false);
     });
     return unsub;
-  }, [user]);
+  }, []);
 
   const saveLead = useCallback(async (lead) => {
-    if (!user) return;
-    const id = await addLead(user.uid, lead);
-    return id;
-  }, [user]);
+    return await fbAdd(lead);
+  }, []);
 
   const saveLeads = useCallback(async (newLeads) => {
-    if (!user) return;
-    const saved = await Promise.all(newLeads.map(l => addLead(user.uid, l)));
+    const saved = await Promise.all(newLeads.map(l => fbAdd(l)));
     trackEvent("bulk_leads_saved", { count: newLeads.length });
     return saved;
-  }, [user]);
+  }, []);
 
   const updateLead = useCallback(async (id, updates) => {
-    if (!user) return;
-    await fbUpdate(user.uid, id, updates);
-  }, [user]);
+    await fbUpdate(id, updates);
+  }, []);
 
   const deleteLead = useCallback(async (id) => {
-    if (!user) return;
-    await fbDelete(user.uid, id);
-  }, [user]);
+    await fbDelete(id);
+  }, []);
 
   const saveSearch = useCallback(async (searchParams, resultCount) => {
-    if (!user) return;
-    await addSearchHistory(user.uid, { ...searchParams, resultCount });
-  }, [user]);
+    await addSearchHistory({ ...searchParams, resultCount });
+  }, []);
 
   return { leads, loading, saveLead, saveLeads, updateLead, deleteLead, saveSearch };
 }
